@@ -5,10 +5,11 @@ import time
 from datetime import datetime
 import warnings
 import streamlit as st
+from sklearn.metrics import classification_report
 warnings.filterwarnings('ignore')
 random_state = 343
 
-api_key = 'RGAPI-6f0e51af-d969-4e67-978e-1cf2048197ae'
+api_key = 'RGAPI-30fab353-19cb-4f85-bf61-07bd940916e0'
 watcher = LolWatcher(api_key)
 my_region = 'na1'
 
@@ -114,20 +115,38 @@ def team_data_from_match(gameId_list, lag = 3):
                     summonerName_list.append(part)
             for i in participant_list:
                 participant_data_df = pd.DataFrame.from_dict(req['participants'])
+                participant_data_df.T
                 team_id.append(participant_data_df['teamId'])
-                st.write(participant_data_df['teamId'])
-                #     # for player in playerDto['player']['SummonerName']:
-                #     ph_player_df = pd.DataFrame.from_dict(ph_part_df['player'])
-                #     summonerName_list.append(ph_player_df['player'][7])
-                # for teamId in ph_part_df['participants']['teamId']:
     participant_df = pd.DataFrame()
     participant_df['summonerName']= pd.Series(summonerName_list)
     participant_df['participantId']= pd.Series(participant_list)
     participant_df['teamId']= pd.Series(team_id)
+    # st.write(participant_df['participantId'][1]['summonerId'])
+    # st.write(participant_df['teamId'][0])
     end = time.time()
+    # grab_summoner_game_data(participant_df, 'Luxorth')
     print(end-start)
     return team_data, participant_df
+
 # preprocessing functions and single data grab
+def grab_summoner_game_data(Name_df, summonerName):
+    team_df = pd.DataFrame()
+    participantId_list = []
+    teamId_list = []
+    summoner_rows = Name_df
+    summoner_rows.reset_index(inplace = True)
+    for row in summoner_rows['participantId']:
+        participantId_list.append(row['accountId'])
+    for part in participantId_list:
+        if part <= 5 :
+            teamId_list.append(100)
+        else:
+            teamId_list.append(200)
+    summoner_rows['participantId'] = pd.Series(participantId_list)
+    summoner_rows['teamId'] = pd.Series(teamId_list)
+    summoner_rows.drop(columns = 'index', inplace = True)
+    return summoner_rows
+
 def call_games(summonerName, games):
     '''
     Calls RIOT API for team data from a single summoner's name
@@ -142,47 +161,40 @@ def call_games(summonerName, games):
     account_list.append(req['accountId'])
     matches = get_gameId_from_accId(account_list, 1)
     team_data, summonerName_df = team_data_from_match(matches[:games], 1)
-    st.write(summonerName_df)
-    team_data['summonerName'] = pd.Series(summonerName_list)
-    team_data_summoner = team_data['summonerName'] == summonerName
-    return(team_data, team_data_summoner)
+    team_data.reset_index(inplace= True)
+    summonerName_df = team_data.join(summonerName_df, rsuffix = 'drop_')
+    summonerName_df.drop(columns = ['bans', 'dominionVictoryScore', 'vilemawKills', 
+        'index', 'teamIddrop_'], inplace = True)
+    return(team_data, summonerName_df) 
 
-def clean_data(team_data):
-    # team_data = team_data.iloc[::5, :]
-    team_data.reset_index(inplace=True)
-    for col in team_data:
-        if col == 'vilemawKills' or col == 'dominionVictoryScore' or col == 'bans':
-            team_data.drop(columns = col, inplace = True)
-    team_data['win'] = team_data['win'].map(lambda x: 1 if x == 'Win' else 0)
-    return(team_data)
-
-def process_data(team_data):
-    y = team_data['win']
-    x = team_data.loc[:, team_data.columns != 'win']
-    x['teamId'] = x['teamId'].map(lambda x: 'Red' if x == 100 else 'Blue')
-    return(x,y)
-
-def displayable_data(team_data_summoner):
-    team_data_summoner['win'] = team_data_summoner['win'].map(lambda x: 'Win' if x == 1 else 'Lost')
+def displayable_data(team_data_summoner, games, summonerName):
+    team_data_summoner  = grab_summoner_game_data(team_data_summoner, summonerName)
     # team_data = call_games(summoner, games)[1]
     for col in team_data_summoner.columns:
         if col == 'index':
-            team_data_summoner.drop(colums = col, inplace = True)
+            team_data_summoner.drop(columns = col, inplace = True)
     team_data_summoner.reset_index()
+    team_data_summoner['win'] = team_data_summoner['win'].map(lambda x: 'Win' if x == 'Win' else 'Lost')
+    team_data_summoner = team_data_summoner[team_data_summoner['summonerName'] == summonerName]
+    team_data_summoner.reset_index(inplace = True)
     return(team_data_summoner)
 
-def scale_data(team_data, scaler):
+def scale_data(team_data, scaler, summonerName):
     for col in team_data.columns:
         if col == 'index':
             team_data.drop(columns = col, inplace = True)
-        if col == 'summonerName':
+        if col == 'level_0':
             team_data.drop(columns = col, inplace = True)
-    X_num = team_data.select_dtypes(include = np.number)
-    X_cat = team_data.select_dtypes(include = [object,bool])
-    for column in X_cat.columns:
-        if column != 'teamId':
-            X_cat[column] = X_cat[column].map(lambda x: 1 if x == True else 0)
-    #fit and transform numerical data with scaler
+        if col == 'participantId':
+            team_data.drop(columns = col, inplace = True)
+    team_data = team_data[team_data['summonerName'] == summonerName]
+    team_data.reset_index(inplace = True)
+    x_num_columns = ['towerKills', 'inhibitorKills', 'dragonKills', 'riftHeraldKills', 'baronKills']
+    x_cat_columns = ['teamId', 'firstBlood','firstTower', 'firstInhibitor', 'firstBaron', 'firstDragon',
+        'firstRiftHerald', 'summonerName', 'win']
+    X_num = team_data[x_num_columns].copy(deep=True)
+    X_cat = team_data[x_cat_columns].copy(deep=True)
+    #fit and transform numerical data with scaler 
     X_num_scaled = scaler.transform(X_num)
     #recombine as DF
     X_num_scaled_df = pd.DataFrame(X_num_scaled, columns = X_num.columns)
@@ -193,34 +205,26 @@ def scale_data(team_data, scaler):
     return(team_data)
 
 def full_process(summonerName, scaler, games):
-    team_data, team_data_summoner = call_games(summonerName, games)
-    team_data_clean = clean_data(team_data)
-    team_data_x, team_data_y = process_data(team_data_clean)
-    team_data_raw= displayable_data(team_data_summoner)
-    team_data_x = scale_data(team_data_x, scaler)
+    team_data, team_data_summoners = call_games(summonerName, games)
+    team_data_raw = displayable_data(team_data_summoners, games, summonerName)
+    team_data_x = scale_data(team_data_summoners, scaler, summonerName)
+    team_data_y = team_data_x['win']
+    team_data_y = team_data_y.map(lambda x: 1 if x =='Win' else 0)
+    team_data_x.drop(columns = ['win', 'summonerName'], inplace = True)
+    st.write(team_data_x)
     return(team_data_x, team_data_y, team_data_raw)
-
-def validation_process(team_data, scaler):
-    team_data_clean = clean_data(team_data)
-    team_data_x, team_data_y = process_data(team_data_clean)
-    team_data_x = scale_data(team_data_x, scaler)
-#     for col in team_data_x.columns:
-#         if col == 'index':
-#             team_data_x.drop(columns = col, inplace = True)
-    return(team_data_x, team_data_y)
 
 def input_model(data, target, model):
     val_pred = model.predict(data)
-    classification_report(target, val_pred)
     return(val_pred)
 
 def recommend(val_pred, target):
     for i, v in enumerate(val_pred):
         if v != target[i]:
             if v == 1:
-                'You probably should have won this game'
+                st.write('You probably should have won this game')
             elif v == 0:
-                'I am surprised you won!'
+                st.write('I am surprised you won!')
         elif v == target[i]:
-            'Correct prediction'
+            st.write('Correct prediction')
     return None
