@@ -22,4 +22,7 @@ if st.button('Search'):
 	else:
 		summoner_data_x, summoner_data_y, summoner_data_raw= full_process(user_input, scaler, games)
 		game_predictions = input_model(summoner_data_x, summoner_data_y, model)
-		recommend(game_predictions, summoner_data_y)
+		for i, pred in enumerate(game_predictions):
+			st.write(summoner_data_raw.iloc[i])
+			recommend(game_predictions[i], summoner_data_y[i], summoner_data_raw, i)
+			

@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report
 warnings.filterwarnings('ignore')
 random_state = 343
 
-api_key = 'RGAPI-30fab353-19cb-4f85-bf61-07bd940916e0'
+api_key = 'RGAPI-13944dcc-7b79-4712-9a24-9d0e4b049f13'
 watcher = LolWatcher(api_key)
 my_region = 'na1'
 
@@ -170,13 +170,15 @@ def call_games(summonerName, games):
 def displayable_data(team_data_summoner, games, summonerName):
     team_data_summoner  = grab_summoner_game_data(team_data_summoner, summonerName)
     # team_data = call_games(summoner, games)[1]
-    for col in team_data_summoner.columns:
-        if col == 'index':
-            team_data_summoner.drop(columns = col, inplace = True)
     team_data_summoner.reset_index()
     team_data_summoner['win'] = team_data_summoner['win'].map(lambda x: 'Win' if x == 'Win' else 'Lost')
     team_data_summoner = team_data_summoner[team_data_summoner['summonerName'] == summonerName]
+    team_data_summoner['teamId'] = team_data_summoner['teamId'].apply(lambda x: 'Blue' if x == 100 else 'Red')
     team_data_summoner.reset_index(inplace = True)
+    team_data_summoner.drop(columns = 'index', inplace = True)
+    column_order = ['summonerName', 'teamId', 'win', 'firstBlood', 'firstTower', 'firstInhibitor', 'firstBaron', 'firstDragon',
+        'firstRiftHerald', 'towerKills', 'inhibitorKills', 'dragonKills', 'riftHeraldKills', 'baronKills']
+    team_data_summoner = team_data_summoner[column_order]
     return(team_data_summoner)
 
 def scale_data(team_data, scaler, summonerName):
@@ -211,20 +213,42 @@ def full_process(summonerName, scaler, games):
     team_data_y = team_data_x['win']
     team_data_y = team_data_y.map(lambda x: 1 if x =='Win' else 0)
     team_data_x.drop(columns = ['win', 'summonerName'], inplace = True)
-    st.write(team_data_x)
     return(team_data_x, team_data_y, team_data_raw)
 
 def input_model(data, target, model):
     val_pred = model.predict(data)
     return(val_pred)
 
-def recommend(val_pred, target):
-    for i, v in enumerate(val_pred):
-        if v != target[i]:
-            if v == 1:
-                st.write('You probably should have won this game')
-            elif v == 0:
-                st.write('I am surprised you won!')
-        elif v == target[i]:
-            st.write('Correct prediction')
+def recommend(val_pred, target, team_data_raw, iteration):
+    if val_pred != target:
+        if val_pred == 1:
+            st.write('You probably should have won this game')
+            inhibitorKills = team_data_raw.iloc[iteration, 10]
+            firstTower = team_data_raw.iloc[iteration, 4]
+            dragonKills = team_data_raw.iloc[iteration, 11]
+            if inhibitorKills < 1:
+                st.write('Recommendation: You should focus on lane objectives more. Downing Towers \
+                    leads to more opportunity to get Inhbitors which allows you more lane pressure \
+                    from Super Minions.')
+            elif firstTower is False:
+                st.write('Recommendation: You should focus on making sure you have good lane pressure,\
+                    this allows you to secure an early tower. Towers provide gold for the whole team, \
+                    causing your team to pull ahead as far as item builds go. This leads to an overall\
+                    better advantage over the opponent.')
+            elif dragonKills < 1:
+                st.write('Recommendation: You should focus on trying to fight for more Dragon kills, \
+                    this provides gold and buff to your team, extending your advantage from other objectives.')
+        elif val_pred == 0:
+            st.write('I am surprised you won!')
+    elif val_pred == target:
+        st.write('Correct prediction')
+    # else:
+    #     for i, v in enumerate(val_pred):
+    #         if v != target[i]:
+    #             if v == 1:
+    #                 st.write('You probably should have won this game')
+    #             elif v == 0:
+    #                 st.write('I am surprised you won!')
+    #         elif v == target[i]:
+    #             st.write('Correct prediction')
     return None
