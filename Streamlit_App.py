@@ -13,7 +13,7 @@ st.write('This app will allow you to input your League of Legends Summoner name 
 
 st.write('If the model determines you should have won it will provide recommendations based on \
 	objectives that the algorithm deems more important. This model has been trained with over\
-	30,000 match outcomes from top ranked players.')
+	30,000 match outcomes from top ranked players. This model will also only work in NA1 accounts.')
 
 
 user_input = st.text_input('Please input summoner name')
