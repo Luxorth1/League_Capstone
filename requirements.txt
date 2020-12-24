@@ -9,4 +9,4 @@ streamlit==0.73.0
 joblib==1.0.0
 imbalanced_learn==0.7.0
 imblearn==0.0
-scikit_learn==0.24.0
+scikit_learn==0.23.2
