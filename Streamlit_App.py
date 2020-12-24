@@ -24,7 +24,7 @@ user_input
 games = st.sidebar.text_input(
     'How many games would you like to analyze? (Please keep this number below 10)',
     )
-if games > 10:
+if int(games) > 10:
 	st.write('PLEASE KEEP THIS NUMBER BELOW 10')
 else:
 	scaler = joblib.load('Min_Max_scaler.gz')
