@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report
 warnings.filterwarnings('ignore')
 random_state = 343
 
-api_key = 'RGAPI-b49a6433-1398-4123-addc-6a98499cacdd'
+api_key = 'RGAPI-9492a503-66e0-46c5-8dab-bbfe38bd8d4a'
 watcher = LolWatcher(api_key)
 my_region = 'na1'
 
